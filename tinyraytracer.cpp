@@ -96,8 +96,20 @@ Vec3f cast_ray(const Vec3f &orig, const Vec3f &dir, const std::vector<Sphere> &s
     Vec3f point, N;
     Material material;
 
+
+
     if (depth>4 || !scene_intersect(orig, dir, spheres, point, N, material)) {
-        return Vec3f(0.2, 0.7, 0.8); // background color
+        //return Vec3f(0.2, 0.7, 0.8); // background color
+
+          int ray = 100;
+            point = dir*ray;
+
+            float teta = -asin(point.y/ray);
+            int l =((teta+(M_PI)/2)/M_PI)*(envmap_height);
+
+            int c = (atan2(point.z,point.x) / (2*M_PI)+0.5)*envmap_width;
+
+            return envmap[c+l*envmap_width];
     }
 
     Vec3f reflect_dir = reflect(dir, N).normalize();
