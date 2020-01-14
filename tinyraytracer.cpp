@@ -11,12 +11,12 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#include "model.h"
+//#include "model.h"
 #include "geometry.h"
 
 int envmap_width, envmap_height;
 std::vector<Vec3f> envmap;
-Model duck("../duck.obj");
+//Model duck("../duck.obj");
 
 struct Light {
     Light(const Vec3f &p, const float i) : position(p), intensity(i) {}
@@ -137,10 +137,19 @@ Vec3f cast_ray(const Vec3f &orig, const Vec3f &dir, const std::vector<Sphere> &s
 }
 
 void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights) {
-    const int   width    = 1024;
+   
     const int   height   = 768;
     const float fov      = M_PI/3.;
-    std::vector<Vec3f> framebuffer(width*height);
+    const int delta =60;
+    const float offset = 0.2;
+    const int   width    = 1024+delta;
+    
+    
+    std::vector<Vec3f> bleu(width*height);
+    std::vector<Vec3f> rouge(width*height);
+    
+    
+    //std::vector<Vec3f> framebuffer(width*height);
 
     #pragma omp parallel for
     for (size_t j = 0; j<height; j++) { // actual rendering loop
@@ -148,20 +157,50 @@ void render(const std::vector<Sphere> &spheres, const std::vector<Light> &lights
             float dir_x =  (i + 0.5) -  width/2.;
             float dir_y = -(j + 0.5) + height/2.;    // this flips the image at the same time
             float dir_z = -height/(2.*tan(fov/2.));
-            framebuffer[i+j*width] = cast_ray(Vec3f(0,0,0), Vec3f(dir_x, dir_y, dir_z).normalize(), spheres, lights);
+            //framebuffer[i+j*width] = cast_ray(Vec3f(0,0,0), Vec3f(dir_x, dir_y, dir_z).normalize(), spheres, lights);
+            
+            bleu[i+j*width] = cast_ray(Vec3f(+offset/2,0,0), Vec3f(dir_x, dir_y, dir_z).normalize(), spheres, lights);
+            rouge[i+j*width] = cast_ray(Vec3f(-offset/2,0,0), Vec3f(dir_x, dir_y, dir_z).normalize(), spheres, lights);
+            
+            printf("i=%d j=%d",i,j);
+            
         }
     }
+    
 
-    std::vector<unsigned char> pixmap(width*height*3);
-    for (size_t i = 0; i < height*width; ++i) {
-        Vec3f &c = framebuffer[i];
-        float max = std::max(c[0], std::max(c[1], c[2]));
-        if (max>1) c = c*(1./max);
-        for (size_t j = 0; j<3; j++) {
-            pixmap[i*3+j] = (unsigned char)(255 * std::max(0.f, std::min(1.f, framebuffer[i][j])));
+  printf("Fin de boucle");
+    
+    std::vector<unsigned char> pixmap((width-delta)*height*3);
+    for (size_t j = 0; j < height; j++) {
+        for (size_t i = 0; i<width-delta;i++) {
+        
+        Vec3f couleurRouge=rouge[i+delta+j*width];
+        Vec3f couleurBleu=bleu[i+j*width];
+        
+        float maxRouge = std::max(couleurRouge[0], std::max(couleurRouge[1], couleurRouge[2]));
+        
+        if (maxRouge>1) 
+            couleurRouge = couleurRouge*(1./maxRouge);
+        
+        float maxBleu = std::max(couleurBleu[0], std::max(couleurBleu[1], couleurBleu[2]));
+        
+        if (maxBleu>1) 
+            couleurBleu = couleurBleu*(1./maxBleu);
+        
+  
+        // Niveau de gris
+        double averageRouge = (couleurRouge[0]+couleurRouge[1]+couleurRouge[2])/3;
+        double averageBleu = (couleurBleu[0]+couleurBleu[1]+couleurBleu[2])/3;
+        
+        pixmap[(j*(width-delta)+i)*3]=255*averageRouge;
+        pixmap[(j*(width-delta)+i)*3+1]=0;
+        pixmap[(j*(width-delta)+i)*3+2]=255*averageBleu;
+        
+        printf("test");
+        
         }
     }
-    stbi_write_jpg("out.jpg", width, height, 3, pixmap.data(), 100);
+    stbi_write_jpg("out.jpg", width-delta, height, 3, pixmap.data(), 100);
 }
 
 int main() {
